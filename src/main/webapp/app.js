@@ -1,5 +1,7 @@
 const STORAGE_KEY = "padel_matchmaker_state";
 const SESSION_PARAM = "session";
+const API_ENDPOINT = "/api/session";
+const POLL_INTERVAL_MS = 5000;
 const DEFAULT_SLOTS = [
   { day: "Måndag", times: ["17:00", "18:00", "19:00", "20:00"] },
   { day: "Onsdag", times: ["17:00", "18:00", "19:00", "20:00"] },
@@ -26,7 +28,7 @@ const demoButton = document.getElementById("use-demo");
 
 const sessionId = getSessionId();
 const state = loadState();
-const channel = new BroadcastChannel(`padel-matchmaker-${sessionId}`);
+let pollTimer;
 
 function getSessionId() {
   const params = new URLSearchParams(window.location.search);
@@ -53,7 +55,6 @@ function loadState() {
 
 function saveState() {
   localStorage.setItem(storageKey(), JSON.stringify(state));
-  channel.postMessage({ type: "sync", payload: state });
 }
 
 function storageKey() {
@@ -67,6 +68,8 @@ function init() {
   renderSchedule();
   updateMatchSummary();
   applyPlayerFromUrl();
+  syncFromServer();
+  startPolling();
 }
 
 function populatePlayerSelect() {
@@ -194,6 +197,7 @@ function handleAvailabilityChange(event) {
   saveState();
   refreshScheduleUI();
   updateMatchSummary();
+  pushToServer();
 }
 
 function refreshScheduleUI() {
@@ -310,6 +314,7 @@ inviteForm.addEventListener("submit", (event) => {
   renderInviteLinks();
   renderSessionLink();
   refreshScheduleUI();
+  pushToServer();
 });
 
 playerSelect.addEventListener("change", () => {
@@ -327,35 +332,57 @@ demoButton.addEventListener("click", () => {
 
 resetButton.addEventListener("click", () => {
   localStorage.removeItem(storageKey());
-  channel.postMessage({ type: "reset" });
   window.location.href = `${window.location.pathname}?${SESSION_PARAM}=${sessionId}`;
 });
 
-window.addEventListener("storage", (event) => {
-  if (event.key !== storageKey() || !event.newValue) {
-    return;
+function startPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
   }
-  const updated = JSON.parse(event.newValue);
-  state.players = updated.players;
-  state.availability = updated.availability;
-  populatePlayerSelect();
-  renderInviteLinks();
-  updateMatchSummary();
-  refreshScheduleUI();
-});
+  pollTimer = setInterval(syncFromServer, POLL_INTERVAL_MS);
+}
 
-channel.addEventListener("message", (event) => {
-  if (!event.data || event.data.type === "reset") {
-    return;
-  }
-  if (event.data.type === "sync") {
-    state.players = event.data.payload.players;
-    state.availability = event.data.payload.availability;
+async function syncFromServer() {
+  try {
+    const response = await fetch(`${API_ENDPOINT}?session=${sessionId}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+      return;
+    }
+    const data = await response.json();
+    if (!data) {
+      return;
+    }
+    state.players = data.players || state.players;
+    state.availability = data.availability || state.availability;
+    saveState();
     populatePlayerSelect();
     renderInviteLinks();
     updateMatchSummary();
     refreshScheduleUI();
+  } catch (error) {
+    console.warn("Kunde inte synka från backend, använder lokal data.", error);
   }
-});
+}
+
+async function pushToServer() {
+  try {
+    const response = await fetch(API_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId,
+        players: state.players,
+        availability: state.availability,
+      }),
+    });
+    if (!response.ok) {
+      return;
+    }
+  } catch (error) {
+    console.warn("Kunde inte spara till backend, lagrar lokalt.", error);
+  }
+}
 
 init();
