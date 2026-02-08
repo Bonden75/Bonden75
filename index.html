@@ -1,0 +1,1081 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>3D Cube – ECIT (Offline) • Face text + Axis labels</title>
+
+  <style>
+    :root{
+      --ecit-blue:#002C55; --ecit-navy:#03223F; --bg:#06121F;
+      --panel: rgba(0,44,85,0.72);
+      --panel-2: rgba(3,34,63,0.88);
+      --text:#fff; --muted: rgba(255,255,255,0.78);
+      --border: rgba(255,255,255,0.14);
+      --accent:#4DA3FF; --accent-border: rgba(77,163,255,0.55);
+      --btn: rgba(255,255,255,0.10); --btn-hover: rgba(255,255,255,0.16);
+      --warn: rgba(255, 210, 77, 0.95);
+    }
+    html, body { height:100%; margin:0; overflow:hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); }
+    #app { position:relative; width:100%; height:100%; }
+
+    #hud{
+      position:absolute; top:12px; left:12px; z-index:10;
+      background: var(--panel); color:var(--text);
+      padding:12px; border-radius:14px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+      min-width: 400px; max-width: 680px;
+      border: 1px solid rgba(255,255,255,0.10);
+      user-select:none;
+    }
+    #hud h1{ font-size:14px; margin:0 0 8px; font-weight:800; letter-spacing:.2px; }
+    #hud .row{ display:flex; gap:10px; align-items:center; margin:8px 0; flex-wrap:wrap; }
+    #hud label{ font-size:12px; opacity:.92; display:block; margin-bottom:4px; }
+    #hud select,#hud input[type="range"],#hud input[type="number"],#hud textarea{
+      width:100%; padding:7px 9px; border-radius:11px;
+      border:1px solid var(--border); background: rgba(255,255,255,0.08);
+      color:var(--text); outline:none;
+    }
+    #hud textarea{ min-height:120px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; }
+    #hud select:focus,#hud input:focus,#hud textarea:focus{
+      border-color: var(--accent-border);
+      box-shadow: 0 0 0 3px rgba(77,163,255,0.14);
+    }
+    .two{ display:grid; grid-template-columns:1fr 1fr; gap:10px; width:100%; }
+    .three{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; width:100%; }
+    .grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; width:100%; }
+
+    .btn{
+      width:100%; padding:8px 10px; border-radius:11px;
+      border:1px solid var(--border); background:var(--btn); color:var(--text);
+      cursor:pointer;
+    }
+    .btn:hover{ background:var(--btn-hover); }
+
+    #status{
+      margin-top:10px; padding:8px 10px; border-radius:12px;
+      border:1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.06);
+      font-size:12px; line-height:1.35;
+      opacity:.95;
+    }
+    #status b{ color: var(--warn); }
+
+    #details{
+      margin-top:10px; padding-top:10px;
+      border-top: 1px solid rgba(255,255,255,0.12);
+      font-size:12px; line-height:1.35;
+    }
+    #details .k{ opacity:.82; }
+
+    #tooltip{
+      position:absolute; z-index:20; pointer-events:none;
+      background: var(--panel-2); color:var(--text);
+      padding:8px 10px; border-radius:12px;
+      font-size:12px; transform: translate(12px, 12px);
+      max-width:520px; display:none;
+      border:1px solid rgba(255,255,255,0.12);
+      box-shadow:0 10px 30px rgba(0,0,0,0.25);
+    }
+
+    #error{
+      position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+      background:var(--bg); color:var(--text); padding:24px; z-index:100;
+    }
+    #error pre{ white-space:pre-wrap; word-break:break-word; background:rgba(255,255,255,0.06); padding:12px; border-radius:12px; max-width: 980px; }
+  </style>
+</head>
+
+<body>
+<div id="app">
+  <div id="hud">
+    <h1>3D Cube – ECIT (Offline) • face text + axis labels</h1>
+
+    <div class="row">
+      <div style="width:100%;">
+        <label>JSON input (lämna tom för att behålla senaste)</label>
+        <textarea id="jsonInput" placeholder="Klistra in JSON här..."></textarea>
+      </div>
+    </div>
+    <div class="row two">
+      <button id="applyJson" class="btn">Visualisera JSON</button>
+      <button id="clearJson" class="btn">Rensa input</button>
+    </div>
+
+    <div class="row two">
+      <div>
+        <label>Datavy</label>
+        <select id="dataView">
+          <option value="clean">clean</option>
+          <option value="all">all</option>
+        </select>
+      </div>
+      <div>
+        <label>Färga efter</label>
+        <select id="colorBy">
+          <option value="p">p (win rate)</option>
+          <option value="n">n (antal)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row two">
+      <div>
+        <label>Min n (filter)</label>
+        <input id="minN" type="number" min="0" step="1" value="8" />
+      </div>
+      <div>
+        <label>Label-kvalitet</label>
+        <select id="labelSize">
+          <option value="256">256</option>
+          <option value="512">512 (skarpare)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row two">
+      <div>
+        <label>Voxel-storlek</label>
+        <input id="voxelSize" type="range" min="0.6" max="1.8" step="0.05" value="1.05" />
+      </div>
+      <div>
+        <label>Spacing</label>
+        <input id="spacing" type="range" min="0.0" max="1.0" step="0.05" value="0.25" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="three">
+        <div>
+          <label>Slice view</label>
+          <select id="sliceView">
+            <option value="isolate">Isolate</option>
+            <option value="fade">Fade others</option>
+          </select>
+        </div>
+        <div>
+          <label>Auto-focus</label>
+          <select id="autoFocus">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button id="focusNow" class="btn">Focus now</button>
+        </div>
+      </div>
+
+      <div class="grid" style="margin-top:8px;">
+        <div>
+          <label>Stage slice</label>
+          <select id="sliceStage"></select>
+        </div>
+        <div>
+          <label>Type slice</label>
+          <select id="sliceType"></select>
+        </div>
+        <div style="grid-column: 1 / span 2;">
+          <label>Bucket slice</label>
+          <select id="sliceBucket"></select>
+        </div>
+      </div>
+
+      <div id="status">Klar.</div>
+    </div>
+
+    <div id="details">
+      <div><span class="k">Vald cell:</span> <span id="selectedTitle">Ingen</span></div>
+      <div id="selectedBody" style="margin-top:6px; opacity:.95;">Hover eller klicka på en voxel. Alt+Klick = slice.</div>
+    </div>
+  </div>
+
+  <div id="tooltip"></div>
+
+  <div id="error">
+    <div>
+      <h2 style="margin:0 0 10px;">Fel</h2>
+      <pre id="errorText"></pre>
+    </div>
+  </div>
+</div>
+
+<script src="./three.min.js"></script>
+
+<script>
+  // friendly error overlay
+  window.addEventListener("error", (e) => {
+    const box = document.getElementById("error");
+    const txt = document.getElementById("errorText");
+    if (box && txt) {
+      box.style.display = "flex";
+      txt.textContent = e.message || String(e.error || e);
+    }
+  });
+</script>
+
+<script>
+  /*****************************************************************
+   * 1) JSON input (persists last used)
+   *****************************************************************/
+  const DEFAULT_JSON = JSON.stringify({
+    meta: {
+      minNCell: 1,
+      stagesRequestedByLabel: ["Lead", "Demo"],
+      stagesResolvedToIds: { "Lead": "stage_lead", "Demo": "stage_demo" },
+      amountBucketsExpected: ["1) 0-10", "2) 11-25"]
+    },
+    clean: {
+      stageType: {
+        "stage_lead|Partner": 1,
+        "stage_lead|Direct": 1,
+        "stage_demo|Partner": 1,
+        "stage_demo|Direct": 1
+      },
+      cell: {
+        "stage_lead|Partner|1) 0-10": { "p": 0.42, "n": 6 },
+        "stage_lead|Partner|2) 11-25": { "p": 0.58, "n": 8 },
+        "stage_lead|Direct|1) 0-10": { "p": 0.35, "n": 5 },
+        "stage_lead|Direct|2) 11-25": { "p": 0.62, "n": 11 },
+        "stage_demo|Partner|1) 0-10": { "p": 0.51, "n": 4 },
+        "stage_demo|Partner|2) 11-25": { "p": 0.67, "n": 9 },
+        "stage_demo|Direct|1) 0-10": { "p": 0.48, "n": 7 },
+        "stage_demo|Direct|2) 11-25": { "p": 0.71, "n": 10 }
+      }
+    },
+    all: {
+      stageType: {
+        "stage_lead|Partner": 1,
+        "stage_lead|Direct": 1,
+        "stage_demo|Partner": 1,
+        "stage_demo|Direct": 1
+      },
+      cell: {
+        "stage_lead|Partner|1) 0-10": { "p": 0.39, "n": 12 },
+        "stage_lead|Partner|2) 11-25": { "p": 0.53, "n": 16 },
+        "stage_lead|Direct|1) 0-10": { "p": 0.33, "n": 11 },
+        "stage_lead|Direct|2) 11-25": { "p": 0.60, "n": 18 },
+        "stage_demo|Partner|1) 0-10": { "p": 0.49, "n": 9 },
+        "stage_demo|Partner|2) 11-25": { "p": 0.66, "n": 15 },
+        "stage_demo|Direct|1) 0-10": { "p": 0.45, "n": 13 },
+        "stage_demo|Direct|2) 11-25": { "p": 0.69, "n": 17 }
+      }
+    }
+  }, null, 2);
+
+  const JSON_STORAGE_KEY = "ecitCubeJson";
+
+  function getStoredJson(){
+    try {
+      const stored = localStorage.getItem(JSON_STORAGE_KEY);
+      return stored && stored.trim().length ? stored : "";
+    } catch (err) {
+      return "";
+    }
+  }
+
+  function setStoredJson(text){
+    try {
+      localStorage.setItem(JSON_STORAGE_KEY, text);
+    } catch (err) {
+      // ignore storage errors
+    }
+  }
+
+  const initialJson = getStoredJson() || DEFAULT_JSON;
+  let RAW = JSON.parse(initialJson);
+  let lastJsonText = initialJson;
+  const jsonInputEl = document.getElementById("jsonInput");
+  jsonInputEl.value = "";
+
+  /*****************************************************************
+   * 2) Helpers + palette
+   *****************************************************************/
+  const el = (id) => document.getElementById(id);
+  const tooltip = el("tooltip");
+  const statusEl = el("status");
+
+  const ECIT = { bg:"#06121F", blue:"#002C55", navy:"#03223F", accent:"#4DA3FF" };
+
+  function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+  function fmtPct(p){ return (p === null || p === undefined || Number.isNaN(p)) ? "—" : (p*100).toFixed(1) + "%"; }
+
+  function colorForP(p){
+    const t = clamp01(p);
+    const c0 = new THREE.Color("#A8D5FF");
+    const c1 = new THREE.Color(ECIT.blue);
+    const c2 = new THREE.Color(ECIT.navy);
+    if (t <= 0.6) return c0.clone().lerp(c1, t / 0.6);
+    return c1.clone().lerp(c2, (t - 0.6) / 0.4);
+  }
+  function colorForN(n, nMax){
+    const t = nMax > 0 ? clamp01(n / nMax) : 0;
+    const c0 = new THREE.Color("#233244");
+    const c1 = new THREE.Color("#EAF2FF");
+    return c0.lerp(c1, t);
+  }
+
+  function setSelectOptions(selectEl, options, current){
+    selectEl.innerHTML = "";
+    for (const v of options){
+      const opt = document.createElement("option");
+      opt.value = v; opt.textContent = v;
+      selectEl.appendChild(opt);
+    }
+    selectEl.value = (current && options.includes(current)) ? current : (options[0] || "");
+  }
+
+  function getCubeView(raw, viewKey){
+    if (raw && raw.meta && (raw.clean || raw.all)) {
+      const key = (viewKey === "all") ? "all" : "clean";
+      const v = raw[key] || raw.clean || raw.all;
+      return { meta: raw.meta, ...v };
+    }
+    return raw;
+  }
+
+  function normalizeStages(meta){
+    const labels = meta?.stagesRequestedByLabel || [];
+    const resolved = meta?.stagesResolvedToIds;
+
+    // new format: object { label: id }
+    if (resolved && !Array.isArray(resolved) && typeof resolved === "object") {
+      const stageIds = labels.map(lbl => resolved[lbl]).filter(Boolean);
+      const stageIdToLabel = {};
+      labels.forEach(lbl => { if (resolved[lbl]) stageIdToLabel[resolved[lbl]] = lbl; });
+      return { stageIds, stageIdToLabel };
+    }
+
+    // old format: array
+    if (Array.isArray(resolved)) {
+      const stageIds = resolved.slice();
+      const stageIdToLabel = {};
+      stageIds.forEach((id, i) => stageIdToLabel[id] = labels[i] || id);
+      return { stageIds, stageIdToLabel };
+    }
+
+    return { stageIds: [], stageIdToLabel: {} };
+  }
+
+  function getTypesFromStageType(stageTypeObj){
+    const s = new Set();
+    Object.keys(stageTypeObj || {}).forEach(k => {
+      const parts = k.split("|");
+      if (parts.length >= 2) s.add(parts[1]);
+    });
+    return Array.from(s);
+  }
+
+  // buckets fallback: derive from cell keys if meta.amountBucketsExpected missing
+  function getBuckets(meta, cellObj){
+    const bucketsSet = new Set((meta?.amountBucketsExpected || []).slice());
+    Object.keys(cellObj || {}).forEach(k => {
+      const parts = k.split("|");
+      if (parts.length >= 3) bucketsSet.add(parts.slice(2).join("|"));
+    });
+    let arr = Array.from(bucketsSet);
+
+    const unknown = arr.filter(x => x === "UNKNOWN_BUCKET");
+    arr = arr.filter(x => x !== "UNKNOWN_BUCKET");
+
+    arr.sort((a,b) => {
+      const ma = a.match(/^(\d+)\)/);
+      const mb = b.match(/^(\d+)\)/);
+      if (ma && mb) return parseInt(ma[1],10) - parseInt(mb[1],10);
+      if (ma && !mb) return -1;
+      if (!ma && mb) return 1;
+      return a.localeCompare(b, "sv");
+    });
+
+    return arr.concat(unknown);
+  }
+
+  /*****************************************************************
+   * 3) Mini-controls (no OrbitControls, offline-friendly)
+   *****************************************************************/
+  function installMiniControls(renderer, camera, target){
+    const dom = renderer.domElement;
+    let isDown=false, isPan=false, lastX=0, lastY=0;
+
+    const spherical = new THREE.Spherical();
+    spherical.setFromVector3(new THREE.Vector3().subVectors(camera.position, target));
+    const minR=6, maxR=320;
+
+    function updateCamera(){
+      const off = new THREE.Vector3().setFromSpherical(spherical);
+      camera.position.copy(target).add(off);
+      camera.lookAt(target);
+    }
+    function pan(dx, dy){
+      const panSpeed = spherical.radius * 0.0012;
+      const vRight = new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion);
+      const vUp = new THREE.Vector3(0,1,0).applyQuaternion(camera.quaternion);
+      const move = new THREE.Vector3()
+        .addScaledVector(vRight, -dx * panSpeed)
+        .addScaledVector(vUp, dy * panSpeed);
+      target.add(move);
+      updateCamera();
+    }
+
+    dom.addEventListener("mousedown", (e) => {
+      const hud = document.getElementById("hud");
+      if (hud && hud.contains(e.target)) return;
+      isDown = true;
+      isPan = e.shiftKey || e.button === 1;
+      lastX = e.clientX; lastY = e.clientY;
+    });
+    window.addEventListener("mouseup", () => { isDown=false; });
+
+    window.addEventListener("mousemove", (e) => {
+      if (!isDown) return;
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      lastX = e.clientX; lastY = e.clientY;
+
+      if (isPan){ pan(dx, dy); return; }
+
+      const rot=0.005;
+      spherical.theta -= dx*rot;
+      spherical.phi   -= dy*rot;
+      spherical.phi = Math.max(0.08, Math.min(Math.PI-0.08, spherical.phi));
+      updateCamera();
+    });
+
+    dom.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const zoomFactor = 1 + (e.deltaY * 0.0012);
+      spherical.radius = Math.max(minR, Math.min(maxR, spherical.radius * zoomFactor));
+      updateCamera();
+    }, { passive:false });
+
+    updateCamera();
+    return { spherical, updateCamera };
+  }
+
+  /*****************************************************************
+   * 4) Face label textures
+   *****************************************************************/
+  const labelTexCache = new Map();
+
+  function roundRect(ctx, x, y, w, h, r){
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r);
+    ctx.arcTo(x, y, x+w, y, r);
+    ctx.closePath();
+  }
+
+  function makeFaceLabelTexture(key, line1, line2, size){
+    if (labelTexCache.has(key)) return labelTexCache.get(key);
+    const canvas = document.createElement("canvas");
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "rgba(2,12,24,0.62)";
+    ctx.strokeStyle = "rgba(77,163,255,0.78)";
+    ctx.lineWidth = Math.max(4, Math.floor(size * 0.02));
+    roundRect(ctx, Math.floor(size*0.05), Math.floor(size*0.05), Math.floor(size*0.90), Math.floor(size*0.90), Math.floor(size*0.08));
+    ctx.fill(); ctx.stroke();
+
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.shadowColor="rgba(0,0,0,0.55)";
+    ctx.shadowBlur=Math.floor(size*0.04);
+
+    const f1 = Math.floor(size * 0.18);
+    const f2 = Math.floor(size * 0.16);
+
+    ctx.fillStyle="#FFFFFF";
+    ctx.font = `900 ${f1}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+    ctx.fillText(line1, size/2, size*0.44);
+
+    ctx.font = `800 ${f2}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+    ctx.fillText(line2, size/2, size*0.64);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.needsUpdate = true;
+
+    labelTexCache.set(key, tex);
+    return tex;
+  }
+
+  function faceIndexClosestToCamera(mesh, camera){
+    const d = new THREE.Vector3().subVectors(camera.position, mesh.position);
+    const ax=Math.abs(d.x), ay=Math.abs(d.y), az=Math.abs(d.z);
+    if (ax >= ay && ax >= az) return d.x >= 0 ? 0 : 1; // +X / -X
+    if (ay >= ax && ay >= az) return d.y >= 0 ? 2 : 3; // +Y / -Y
+    return d.z >= 0 ? 4 : 5; // +Z / -Z
+  }
+  function setVoxelLabelFace(mesh, faceIndex){
+    const ud = mesh.userData;
+    if (ud.labelFace === faceIndex) return;
+    if (ud.labelFace !== null && ud.labelFace !== undefined){
+      mesh.material[ud.labelFace] = ud.baseMat;
+    }
+    mesh.material[faceIndex] = ud.labelMat;
+    ud.labelFace = faceIndex;
+  }
+
+  /*****************************************************************
+   * 5) Axis label sprites (clickable)
+   *****************************************************************/
+  function makeTextSprite(text, opts = {}){
+    const padding = opts.padding ?? 12;
+    const fontSize = opts.fontSize ?? 30;
+    const font = opts.font ?? "system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+    const bg = opts.bg ?? "rgba(0,44,85,0.28)";
+    const border = opts.border ?? "rgba(255,255,255,0.18)";
+    const fg = opts.fg ?? "#ffffff";
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    ctx.font = `800 ${fontSize}px ${font}`;
+    const metrics = ctx.measureText(text);
+    const w = Math.ceil(metrics.width + padding * 2);
+    const h = Math.ceil(fontSize + padding * 2);
+    canvas.width = w; canvas.height = h;
+
+    ctx.font = `800 ${fontSize}px ${font}`;
+    ctx.textBaseline = "middle";
+
+    const r = 12;
+    ctx.fillStyle = bg;
+    ctx.strokeStyle = border;
+    ctx.lineWidth = 2;
+
+    function rr(x,y,width,height,radius){
+      ctx.beginPath();
+      ctx.moveTo(x+radius, y);
+      ctx.arcTo(x+width, y, x+width, y+height, radius);
+      ctx.arcTo(x+width, y+height, x, y+height, radius);
+      ctx.arcTo(x, y+height, x, y, radius);
+      ctx.arcTo(x, y, x+width, y, radius);
+      ctx.closePath();
+    }
+    rr(2, 2, w-4, h-4, r);
+    ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = fg;
+    ctx.shadowColor = "rgba(0,0,0,0.45)";
+    ctx.shadowBlur = 8;
+    ctx.fillText(text, padding, h/2);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+
+    const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+    const sprite = new THREE.Sprite(material);
+
+    const scale = opts.scale ?? 0.11;
+    sprite.scale.set(w * scale * 0.02, h * scale * 0.02, 1);
+    return sprite;
+  }
+
+  function clearGroup(g){ while (g.children.length) g.remove(g.children[0]); }
+
+  /*****************************************************************
+   * 6) Scene
+   *****************************************************************/
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(ECIT.bg);
+
+  const camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 4000);
+  camera.position.set(24, 20, 24);
+
+  const renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.getElementById("app").appendChild(renderer.domElement);
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x0a1220, 1.05));
+  const dl = new THREE.DirectionalLight(0xffffff, 1.0);
+  dl.position.set(30, 40, 20);
+  scene.add(dl);
+
+  const grid = new THREE.GridHelper(200, 200, 0x2b3f55, 0x1b2a3a);
+  grid.position.y = -10;
+  scene.add(grid);
+
+  const voxelsGroup = new THREE.Group();
+  scene.add(voxelsGroup);
+
+  const labelsGroup = new THREE.Group();
+  scene.add(labelsGroup);
+
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+
+  const target = new THREE.Vector3(0,0,0);
+  const mini = installMiniControls(renderer, camera, target);
+
+  /*****************************************************************
+   * 7) Cube state + slices
+   *****************************************************************/
+  let cube=null, meta=null;
+  let stageIds=[], stageIdToLabel={};
+  let types=[], buckets=[];
+  let stageFriendly=[], stageLabelToId=new Map();
+
+  function getSlices(){
+    return {
+      stage: el("sliceStage").value,
+      type: el("sliceType").value,
+      bucket: el("sliceBucket").value,
+      view: el("sliceView").value,
+      autoFocus: el("autoFocus").value
+    };
+  }
+  function sliceStageToStageId(stageLabel){
+    if (!stageLabel || stageLabel === "All") return null;
+    return stageLabelToId.get(stageLabel) || null;
+  }
+  function matchesSlices(d){
+    const s = getSlices();
+    const stageId = sliceStageToStageId(s.stage);
+    if (stageId && d.stageId !== stageId) return false;
+    if (s.type !== "All" && d.type !== s.type) return false;
+    if (s.bucket !== "All" && d.bucket !== s.bucket) return false;
+    return true;
+  }
+
+  function getCell(stageId, type, bucket){
+    const key = `${stageId}|${type}|${bucket}`;
+    const v = (cube.cell || {})[key];
+    return v ? { p: v.p, n: v.n } : null;
+  }
+
+  function rebuildCubeContext(){
+    const viewKey = el("dataView").value || "clean";
+    cube = getCubeView(RAW, viewKey);
+    meta = RAW.meta || cube.meta || {};
+
+    const st = normalizeStages(meta);
+    stageIds = st.stageIds;
+    stageIdToLabel = st.stageIdToLabel;
+
+    types = getTypesFromStageType(cube.stageType || {});
+    if (!types.length) types = ["UNKNOWN_TYPE"];
+
+    buckets = getBuckets(meta, cube.cell || {});
+
+    stageFriendly = stageIds.map(id => stageIdToLabel[id] || id);
+    stageLabelToId = new Map(stageFriendly.map((lbl, i) => [lbl, stageIds[i]]));
+
+    setSelectOptions(el("sliceStage"), ["All", ...stageFriendly], el("sliceStage").value || "All");
+    setSelectOptions(el("sliceType"),  ["All", ...types],        el("sliceType").value  || "All");
+    setSelectOptions(el("sliceBucket"),["All", ...buckets],      el("sliceBucket").value|| "All");
+
+    // sätt minN från meta som default om fältet är tomt
+    if (meta?.minNCell !== undefined && (el("minN").value === "" || el("minN").value === null)) {
+      el("minN").value = String(meta.minNCell);
+    }
+  }
+
+  /*****************************************************************
+   * 8) Axis labels build (clickable)
+   *****************************************************************/
+  let lastLayout = null;
+
+  function rebuildAxisLabels(){
+    clearGroup(labelsGroup);
+    if (!lastLayout) return;
+
+    const s = getSlices();
+    const { x0,y0,z0,dx,dy,dz } = lastLayout;
+
+    const headerBg = "rgba(77,163,255,0.14)";
+    const headerBorder = "rgba(77,163,255,0.32)";
+
+    // Buckets (X)
+    for (let xi=0; xi<buckets.length; xi++){
+      const b = buckets[xi];
+      const active = (s.bucket !== "All" && s.bucket === b);
+      const spr = makeTextSprite(b, {
+        fontSize: 28, scale: 0.12,
+        bg: active ? "rgba(77,163,255,0.20)" : "rgba(0,44,85,0.30)",
+        border: active ? "rgba(77,163,255,0.65)" : "rgba(255,255,255,0.18)"
+      });
+      spr.position.set(x0 + xi*dx, y0 - (dy*1.1), z0 - (dz*1.1));
+      spr.userData = { kind:"axisLabel", axis:"bucket", value:b };
+      labelsGroup.add(spr);
+    }
+    const bx = makeTextSprite("Buckets (X)", { fontSize: 26, scale: 0.12, bg: headerBg, border: headerBorder });
+    bx.position.set(x0 + ((buckets.length-1)*dx)/2, y0 - (dy*2.1), z0 - (dz*1.1));
+    bx.userData = { kind:"axisHeader" };
+    labelsGroup.add(bx);
+
+    // Stages (Y)
+    for (let yi=0; yi<stageIds.length; yi++){
+      const stageId = stageIds[yi];
+      const lbl = stageIdToLabel[stageId] || stageId;
+      const active = (s.stage !== "All" && s.stage === lbl);
+      const spr = makeTextSprite(lbl, {
+        fontSize: 28, scale: 0.12,
+        bg: active ? "rgba(77,163,255,0.20)" : "rgba(0,44,85,0.30)",
+        border: active ? "rgba(77,163,255,0.65)" : "rgba(255,255,255,0.18)"
+      });
+      spr.position.set(x0 - (dx*1.25), y0 + yi*dy, z0 - (dz*1.1));
+      spr.userData = { kind:"axisLabel", axis:"stage", value:lbl };
+      labelsGroup.add(spr);
+    }
+    const by = makeTextSprite("Stages (Y)", { fontSize: 26, scale: 0.12, bg: headerBg, border: headerBorder });
+    by.position.set(x0 - (dx*2.3), y0 + ((stageIds.length-1)*dy)/2, z0 - (dz*1.1));
+    by.userData = { kind:"axisHeader" };
+    labelsGroup.add(by);
+
+    // Types (Z)
+    for (let zi=0; zi<types.length; zi++){
+      const t = types[zi];
+      const active = (s.type !== "All" && s.type === t);
+      const spr = makeTextSprite(t, {
+        fontSize: 28, scale: 0.12,
+        bg: active ? "rgba(77,163,255,0.20)" : "rgba(0,44,85,0.30)",
+        border: active ? "rgba(77,163,255,0.65)" : "rgba(255,255,255,0.18)"
+      });
+      spr.position.set(x0 - (dx*1.25), y0 - (dy*1.1), z0 + zi*dz);
+      spr.userData = { kind:"axisLabel", axis:"type", value:t };
+      labelsGroup.add(spr);
+    }
+    const bz = makeTextSprite("Types (Z)", { fontSize: 26, scale: 0.12, bg: headerBg, border: headerBorder });
+    bz.position.set(x0 - (dx*2.3), y0 - (dy*1.1), z0 + ((types.length-1)*dz)/2);
+    bz.userData = { kind:"axisHeader" };
+    labelsGroup.add(bz);
+  }
+
+  function toggleSlice(axis, value){
+    if (axis === "stage") {
+      el("sliceStage").value = (el("sliceStage").value === value) ? "All" : value;
+    } else if (axis === "type") {
+      el("sliceType").value = (el("sliceType").value === value) ? "All" : value;
+    } else if (axis === "bucket") {
+      el("sliceBucket").value = (el("sliceBucket").value === value) ? "All" : value;
+    }
+    rebuildVoxels();
+  }
+
+  /*****************************************************************
+   * 9) Focus + rebuild voxels (with auto-fix if 0 voxels)
+   *****************************************************************/
+  function focusToSlice(){
+    const matches = [];
+    voxelsGroup.children.forEach(m => {
+      if (m.userData?.kind !== "voxel") return;
+      if (matchesSlices(m.userData)) matches.push(m);
+    });
+    if (!matches.length) return;
+
+    const box = new THREE.Box3();
+    matches.forEach(o => box.expandByObject(o));
+    const center = new THREE.Vector3();
+    const size = new THREE.Vector3();
+    box.getCenter(center);
+    box.getSize(size);
+
+    target.copy(center);
+
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const fov = camera.fov * (Math.PI / 180);
+    const dist = (maxDim / 2) / Math.tan(fov / 2) * 1.8;
+
+    mini.spherical.radius = Math.max(6, Math.min(320, dist));
+    mini.updateCamera();
+  }
+
+  function rebuildVoxels(){
+    while (voxelsGroup.children.length) voxelsGroup.remove(voxelsGroup.children[0]);
+
+    const minN = Math.max(0, parseInt(el("minN").value || "0", 10));
+    const colorBy = el("colorBy").value;
+    const voxelSize = parseFloat(el("voxelSize").value || "1.0");
+    const spacing = parseFloat(el("spacing").value || "0.25");
+    const labelSize = Math.max(128, parseInt(el("labelSize").value || "256", 10));
+
+    if (!stageIds.length || !types.length || !buckets.length) {
+      statusEl.innerHTML = `<b>Inga dimensioner hittades.</b> Kontrollera att JSON innehåller cell-nycklar.`;
+      clearGroup(labelsGroup);
+      return;
+    }
+
+    // nMax (för färgning)
+    let nMax = 0;
+    for (const s of stageIds){
+      for (const t of types){
+        for (const b of buckets){
+          const c = getCell(s, t, b);
+          if (c && c.n > nMax) nMax = c.n;
+        }
+      }
+    }
+
+    const geom = new THREE.BoxGeometry(voxelSize, voxelSize, voxelSize);
+    const dx = voxelSize + spacing;
+    const dy = voxelSize + spacing;
+    const dz = voxelSize + spacing;
+
+    const x0 = -((buckets.length - 1) * dx) / 2;
+    const y0 = -((stageIds.length - 1) * dy) / 2;
+    const z0 = -((types.length - 1) * dz) / 2;
+
+    lastLayout = { x0,y0,z0,dx,dy,dz };
+    rebuildAxisLabels();
+
+    const slices = getSlices();
+    let drawn = 0;
+
+    for (let yi=0; yi<stageIds.length; yi++){
+      const stageId = stageIds[yi];
+      const stageLabel = stageIdToLabel[stageId] || stageId;
+
+      for (let zi=0; zi<types.length; zi++){
+        const type = types[zi];
+
+        for (let xi=0; xi<buckets.length; xi++){
+          const bucket = buckets[xi];
+          const c = getCell(stageId, type, bucket);
+          if (!c || c.n < minN) continue;
+
+          const d = { kind:"voxel", stageId, stageLabel, type, bucket, p:c.p, n:c.n };
+          const match = matchesSlices(d);
+
+          if (slices.view === "isolate" && !match) continue;
+
+          const matColor = (colorBy === "p") ? colorForP(c.p) : colorForN(c.n, nMax);
+
+          const baseMat = new THREE.MeshStandardMaterial({
+            color: matColor,
+            roughness: match ? 0.52 : 0.98,
+            metalness: 0.02,
+            transparent: true,
+            opacity: (slices.view === "fade" && !match) ? 0.10 : 0.92
+          });
+
+          const line1 = `p ${fmtPct(c.p)}`;
+          const line2 = `n ${c.n}`;
+          const labelKey = `${labelSize}|${line1}|${line2}`;
+
+          const tex = makeFaceLabelTexture(labelKey, line1, line2, labelSize);
+          const labelMat = new THREE.MeshBasicMaterial({
+            map: tex,
+            transparent: true,
+            opacity: (slices.view === "fade" && !match) ? 0.10 : 0.98,
+            depthTest: true,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1
+          });
+
+          const mats = [baseMat, baseMat, baseMat, baseMat, baseMat, baseMat];
+          const mesh = new THREE.Mesh(geom, mats);
+          mesh.position.set(x0 + xi*dx, y0 + yi*dy, z0 + zi*dz);
+          mesh.userData = { ...d, baseMat, labelMat, labelFace: null };
+
+          voxelsGroup.add(mesh);
+          drawn++;
+        }
+      }
+    }
+
+    // ✅ AUTO-FIX: om 0 voxlar, sänk minN till något som ger output
+    if (drawn === 0){
+      // hitta minsta n som finns i cellerna
+      let minFound = Infinity;
+      let maxFound = 0;
+      Object.values(cube.cell || {}).forEach(v => {
+        if (!v || typeof v.n !== "number") return;
+        minFound = Math.min(minFound, v.n);
+        maxFound = Math.max(maxFound, v.n);
+      });
+      if (minFound === Infinity) minFound = 0;
+
+      // om minN är för högt (vanligt i clean), sänk till minFound eller 1
+      const suggested = Math.max(1, Math.min(3, minFound)); // oftast 1 funkar bäst
+      if (minN > suggested){
+        el("minN").value = String(suggested);
+        statusEl.innerHTML = `<b>0 voxlar</b> med Min n=${minN}. Jag sänkte till <b>${suggested}</b> (clean har ofta n=1–2).`;
+        // bygg om direkt med nya minN
+        return rebuildVoxels();
+      } else {
+        statusEl.innerHTML = `<b>0 voxlar</b>. Prova sänka Min n eller byt till Datavy=all. (n finns mellan ${minFound} och ${maxFound})`;
+      }
+    } else {
+      statusEl.textContent = `Ritar ${drawn} voxlar • Datavy=${el("dataView").value} • Min n=${el("minN").value}`;
+    }
+
+    if (getSlices().autoFocus === "on") focusToSlice();
+
+    voxelsGroup.children.forEach(m => {
+      const fi = faceIndexClosestToCamera(m, camera);
+      setVoxelLabelFace(m, fi);
+    });
+  }
+
+  /*****************************************************************
+   * 10) Picking (voxels + axis labels)
+   *****************************************************************/
+  function pickObject(event){
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
+    raycaster.setFromCamera(mouse, camera);
+
+    const labelHits = raycaster.intersectObjects(labelsGroup.children, false);
+    if (labelHits.length) return labelHits[0].object;
+
+    const voxelHits = raycaster.intersectObjects(voxelsGroup.children, false);
+    if (voxelHits.length) return voxelHits[0].object;
+
+    return null;
+  }
+
+  function setSelected(mesh){
+    if (!mesh || mesh.userData?.kind !== "voxel"){
+      el("selectedTitle").textContent = "Ingen";
+      el("selectedBody").textContent = "Hover eller klicka på en voxel. Alt+Klick = slice.";
+      return;
+    }
+    const d = mesh.userData;
+    el("selectedTitle").textContent = `${d.stageLabel} • ${d.type} • ${d.bucket}`;
+    el("selectedBody").innerHTML =
+      `<div><span class="k">Win rate (p):</span> <b>${fmtPct(d.p)}</b></div>` +
+      `<div><span class="k">Antal (n):</span> <b>${d.n}</b></div>` +
+      `<div style="margin-top:6px; opacity:.9;"><span class="k">Stage ID:</span> ${d.stageId}</div>`;
+  }
+
+  function showTooltip(obj, clientX, clientY){
+    if (!obj){ tooltip.style.display = "none"; return; }
+    tooltip.style.display = "block";
+    tooltip.style.left = clientX + "px";
+    tooltip.style.top  = clientY + "px";
+
+    const d = obj.userData || {};
+    if (d.kind === "axisLabel"){
+      tooltip.innerHTML = `<div style="font-weight:800; margin-bottom:4px;">${d.axis.toUpperCase()}</div><div>Klicka för slice: <b>${d.value}</b></div>`;
+      return;
+    }
+    if (d.kind === "voxel"){
+      tooltip.innerHTML = `<div style="font-weight:800; margin-bottom:4px;">${d.stageLabel} • ${d.type} • ${d.bucket}</div><div>p: <b>${fmtPct(d.p)}</b> &nbsp; n: <b>${d.n}</b></div>`;
+      return;
+    }
+    tooltip.style.display = "none";
+  }
+
+  renderer.domElement.addEventListener("mousemove", (e) => {
+    const hud = document.getElementById("hud");
+    if (hud && hud.contains(e.target)) return;
+    const hit = pickObject(e);
+    showTooltip(hit, e.clientX, e.clientY);
+  });
+  renderer.domElement.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
+
+  renderer.domElement.addEventListener("click", (e) => {
+    const hud = document.getElementById("hud");
+    if (hud && hud.contains(e.target)) return;
+
+    const hit = pickObject(e);
+
+    if (hit?.userData?.kind === "axisLabel"){
+      toggleSlice(hit.userData.axis, hit.userData.value);
+      return;
+    }
+
+    if (hit?.userData?.kind === "voxel"){
+      setSelected(hit);
+
+      // Alt+click voxel => set all three slices to that cell (toggle exact)
+      if (e.altKey){
+        const d = hit.userData;
+        const exact =
+          el("sliceStage").value === d.stageLabel &&
+          el("sliceType").value === d.type &&
+          el("sliceBucket").value === d.bucket;
+
+        if (exact){
+          el("sliceStage").value = "All";
+          el("sliceType").value = "All";
+          el("sliceBucket").value = "All";
+        } else {
+          el("sliceStage").value = d.stageLabel;
+          el("sliceType").value = d.type;
+          el("sliceBucket").value = d.bucket;
+        }
+        rebuildVoxels();
+      }
+    } else {
+      setSelected(null);
+    }
+  });
+
+  /*****************************************************************
+   * 11) UI bindings
+   *****************************************************************/
+  ["dataView","colorBy","minN","labelSize","voxelSize","spacing","sliceView","autoFocus","sliceStage","sliceType","sliceBucket"].forEach(id => {
+    el(id).addEventListener("input", () => {
+      if (id === "dataView") rebuildCubeContext();
+      rebuildVoxels();
+    });
+    el(id).addEventListener("change", () => {
+      if (id === "dataView") rebuildCubeContext();
+      rebuildVoxels();
+    });
+  });
+
+  el("focusNow").addEventListener("click", focusToSlice);
+
+  el("applyJson").addEventListener("click", () => {
+    const next = jsonInputEl.value.trim();
+    if (!next){
+      statusEl.innerHTML = "Ingen ny JSON inmatad. Kör vidare på den senaste.";
+      return;
+    }
+    try {
+      const parsed = JSON.parse(next);
+      RAW = parsed;
+      lastJsonText = next;
+      setStoredJson(next);
+      jsonInputEl.value = "";
+      rebuildCubeContext();
+      rebuildVoxels();
+      focusToSlice();
+      statusEl.textContent = "Ny JSON laddad och visualiserad.";
+    } catch (err) {
+      statusEl.innerHTML = `<b>JSON-fel:</b> ${err.message || err}`;
+    }
+  });
+
+  el("clearJson").addEventListener("click", () => {
+    jsonInputEl.value = "";
+    statusEl.textContent = "Input rensad. Ingen ny JSON inmatad.";
+  });
+
+  /*****************************************************************
+   * 12) Init + animate
+   *****************************************************************/
+  rebuildCubeContext();
+  rebuildVoxels();
+  focusToSlice();
+
+  window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  function animate(){
+    requestAnimationFrame(animate);
+    // label face follow camera
+    for (const m of voxelsGroup.children){
+      const fi = faceIndexClosestToCamera(m, camera);
+      setVoxelLabelFace(m, fi);
+    }
+    renderer.render(scene, camera);
+  }
+  animate();
+</script>
+</body>
+</html>
