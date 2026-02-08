@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="sv">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Padel Matchmaker</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="hero__content">
+        <p class="hero__eyebrow">Silverdal Padelopen-inspirerad</p>
+        <h1>Padel Matchmaker</h1>
+        <p class="hero__lead">
+          Bjud in tre vänner, låt alla kryssa i tider som passar och hitta er
+          match direkt.
+        </p>
+        <div class="hero__cta">
+          <button class="button button--primary" id="reset-demo">Starta om demo</button>
+          <span class="hero__note">Ingen backend – all data lagras lokalt.</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="card" aria-labelledby="invite-title">
+        <div class="card__header">
+          <h2 id="invite-title">1. Bjud in spelare</h2>
+          <p>Lägg in fyra e-postadresser för att skapa personliga länkar.</p>
+        </div>
+        <form id="invite-form" class="invite-form">
+          <div class="invite-grid">
+            <label>
+              Spelare 1
+              <input type="email" name="player1" placeholder="alex@mail.se" required />
+            </label>
+            <label>
+              Spelare 2
+              <input type="email" name="player2" placeholder="bea@mail.se" required />
+            </label>
+            <label>
+              Spelare 3
+              <input type="email" name="player3" placeholder="chris@mail.se" required />
+            </label>
+            <label>
+              Spelare 4
+              <input type="email" name="player4" placeholder="dani@mail.se" required />
+            </label>
+          </div>
+          <div class="invite-actions">
+            <button class="button button--primary" type="submit">Skapa länkar</button>
+            <button class="button button--ghost" type="button" id="use-demo">Fyll demo</button>
+          </div>
+        </form>
+        <div class="invite-links" id="invite-links" aria-live="polite"></div>
+        <div class="session-link" id="session-link" aria-live="polite"></div>
+      </section>
+
+      <section class="card" aria-labelledby="availability-title">
+        <div class="card__header">
+          <h2 id="availability-title">2. Välj tider</h2>
+          <p>
+            Se vad de andra har valt och kryssa för tider som passar dig. När
+            alla fyra är lediga samtidigt visas en match.
+          </p>
+        </div>
+        <div class="availability-controls">
+          <label for="player-select">Jag är</label>
+          <select id="player-select"></select>
+          <span class="status-pill" id="player-status">Välj spelare för att börja</span>
+        </div>
+        <div class="legend">
+          <span class="legend__item"><span class="legend__dot legend__dot--you"></span>Din tid</span>
+          <span class="legend__item"><span class="legend__dot legend__dot--other"></span>Annan spelare</span>
+          <span class="legend__item"><span class="legend__dot legend__dot--match"></span>Match hittad</span>
+        </div>
+        <div class="schedule" id="schedule"></div>
+      </section>
+
+      <section class="card" aria-labelledby="summary-title">
+        <div class="card__header">
+          <h2 id="summary-title">3. Resultat</h2>
+          <p>Matchen visas när alla fyra spelare har kryssat samma tid.</p>
+        </div>
+        <div id="match-summary" class="match-summary">
+          <div class="match-summary__empty">Ingen match ännu. Fortsätt att fylla i tider.</div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Skiss för padelbokning – redo att kopplas till riktig backend.</p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>
