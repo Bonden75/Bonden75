@@ -354,6 +354,17 @@ async function syncFromServer() {
     if (!data) {
       return;
     }
+    const hasServerPlayers = (data.players || []).some((player) => player);
+    const hasServerAvailability = Object.values(data.availability || {}).some(
+      (slots) => Array.isArray(slots) && slots.length > 0
+    );
+    const hasLocalPlayers = state.players.some((player) => player);
+    const hasLocalAvailability = Object.values(state.availability).some(
+      (slots) => Array.isArray(slots) && slots.length > 0
+    );
+    if (!hasServerPlayers && !hasServerAvailability && (hasLocalPlayers || hasLocalAvailability)) {
+      return;
+    }
     state.players = data.players || state.players;
     state.availability = data.availability || state.availability;
     saveState();
