@@ -7,6 +7,7 @@
   <groupId>com.bonden75</groupId>
   <artifactId>ecit-cube-viewer</artifactId>
   <version>0.1.0-SNAPSHOT</version>
+  <packaging>war</packaging>
   <name>ECIT Cube Viewer</name>
   <description>Static 3D cube viewer with JSON input persistence.</description>
 </project>
